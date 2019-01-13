@@ -23,6 +23,7 @@
 --]]
 
 -- Probe function.
+local utf8 = require("utf8")
 function probe()
     local path = vlc.path
     path = path:gsub("^www%.", "")
@@ -61,6 +62,15 @@ function parse()
         local prefres = vlc.var.inherit(nil, "preferred-resolution")
         local bestres = nil
         local line = vlc.readline() -- data is on one line only
+        
+        if not string.match( line, "{([^}]*\"profile\":[^}]*)}" ) then
+            while true do
+                line = vlc.readline()
+                if string.match( line, "{([^}]*\"profile\":[^}]*)}" ) then break end
+                if not line then break end
+            end
+        end
+        
 
         for stream in string.gmatch( line, "{([^}]*\"profile\":[^}]*)}" ) do
             local url = string.match( stream, "\"url\":\"(.-)\"" )
@@ -88,12 +98,17 @@ function parse()
             vlc.msg.err( "Couldn't extract vimeo video URL, please check for updates to this script" )
             return { }
         end
-
-        local name = string.match( line, "\"title\":\"(.-)\"" )
+        function f(s)
+            local moji = string.gsub( s, "\\u", "0x")
+            return utf8.char(tonumber(moji),16)
+        end
+        local name = string.match( line, "\"title\":\"(.-)\"\," )
+        name = string.gsub( name, "\\u%x%x%x%x" ,f)
+        name = string.gsub( name, "\\" ,"")
         local artist = string.match( line, "\"owner\":{[^}]-\"name\":\"(.-)\"" )
+        artist = string.gsub( artist, "\\u%x%x%x%x" ,f)
         local arturl = string.match( line, "\"thumbs\":{\"[^\"]+\":\"(.-)\"" )
         local duration = string.match( line, "\"duration\":(%d+)[,}]" )
-
         return { { path = path; name = name; artist = artist; arturl = arturl; duration = duration } }
     end
 end
